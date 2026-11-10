@@ -387,7 +387,8 @@ function home(){
   const curUnit=cur?cur.ui:-1;
   let h=`<div class="home"><div class="top"><div class="brand">${I.logo}<h1>مسار بايثون</h1></div>
     <span class="chip" title="أيام متتالية">${I.fire}<span class="ltr">${shownStreak()}</span> يوم</span>
-    <span class="chip" title="نقاط الخبرة"><span style="color:var(--sun);display:flex">${I.star(15)}</span><span class="ltr">${S.xp}</span> XP</span></div>`;
+    <span class="chip" title="نقاط الخبرة"><span style="color:var(--sun);display:flex">${I.star(15)}</span><span class="ltr">${S.xp}</span> XP</span>
+    <button class="chip" data-act="snd" aria-pressed="${sndOn}">الصوت: ${sndOn?'يعمل':'متوقف'}</button></div>`;
   if(cur) h+=`<section class="next"><small>${ci?'تابع من حيث توقفت':'ابدأ من هنا'} · الفصل ${AR_N[cur.ui]}: ${esc(cur.u.t)}</small><h2>${esc(cur.t)}</h2><button class="btn" data-act="lesson" data-id="${cur.id}">${I.play} ${ci?'تابع الدرس':'ابدأ أول درس'}</button></section>`;
   else h+=`<section class="next"><small>أنهيت قسم الأساسيات كاملاً</small><h2>صار عندك أساس متين في بايثون</h2><p>واصل المراجعة اليومية حتى تثبت المعلومات، وأعد أي تحدٍّ لتحصل على ثلاث نجوم.</p></section>`;
   h+=`<section class="rev"><div><b>مراجعة ${due.length?`(${due.length})`:''}</b><span>${practiced?(due.length?'تمارين حان وقت تثبيتها. الأخطاء تعود أسرع، والمتقَن يتباعد.':'لا شيء مستحق اليوم. يمكنك المراجعة الحرة.'):'بعد أول درس تظهر هنا التمارين التي تحتاج تثبيتاً.'}</span></div><button class="btn ${due.length?'sun':'ghost'}" data-act="review" ${practiced?'':'disabled'}>راجع الآن</button></section>`;
@@ -514,7 +515,7 @@ function check(){
   done(ok,fb);
 }
 function done(ok,fb){
-  const c=cur(); ui.checked=true; ui.ok=ok; ui.fb=fb||'';
+  const c=cur(); ui.checked=true; ui.ok=ok; ui.fb=fb||''; snd(ok?'ok':'bad');
   record(c.id,ok);
   if(ok) session.cleared++; else { session.mistakes++; if(session.kind!=='jump') session.queue.push({st:c.st,id:c.id}); }
   body(); foot();
@@ -523,7 +524,7 @@ async function checkCode(){
   const c=cur(), st=c.st, src=fixQuotes($('#ed').value);
   ui.busy=true; ui.fb=''; foot();
   const r=await judge(st,src);
-  ui.busy=false;
+  ui.busy=false; snd(r.ok?'ok':'bad');
   if(r.ok){ ui.checked=true; ui.ok=true; record(c.id,!ui.failed&&!ui.sol); session.cleared++; $('#ed').readOnly=true; }
   else { ui.tries++; ui.fb=r.msg; if(!ui.failed){ ui.failed=true; session.mistakes++; record(c.id,false); } }
   tools(); foot();
@@ -551,7 +552,7 @@ function finish(){
     sub=st===3?'بدون أي خطأ.':'التمارين التي أخطأت فيها ستعود إليك في المراجعة حتى تثبت.';
   } else if(s.kind==='review'){ xp=5+(s.mistakes===0?3:0); title='انتهت المراجعة'; sub=s.mistakes?'ما أخطأت فيه سيعود غداً، والباقي بعد أيام.':'كلها صحيحة. ستعود هذه التمارين بعد فترة أطول.'; }
   else { s.unit.l.forEach(l=>{ if(!isDone(l.id)) S.done[l.id]=1; }); xp=25; title='تجاوزت الفصل'; sub=`فصل «${s.unit.t}» صار مفتوحاً كله. يمكنك العودة إلى أي درس فيه متى شئت.`; }
-  S.xp+=xp; bump(); save();
+  S.xp+=xp; bump(); save(); snd('win');
   app.innerHTML=`<div class="end"><div class="big">${s.kind==='lesson'?stars(st,44):`<span>${I.star(56)}</span>`}</div><h2>${title}</h2><p>${esc(sub)}</p><div class="stats"><div class="stat"><b class="ltr">+${xp}</b><span>XP</span></div><div class="stat"><b class="ltr">${S.streak}</b><span>يوم متتالٍ</span></div><div class="stat"><b class="ltr">${s.mistakes}</b><span>أخطاء</span></div></div><button class="btn" data-act="home">متابعة</button></div>`;
   session=null; window.scrollTo(0,0);
 }
@@ -574,9 +575,26 @@ function bindEditor(){
   $('#keys').addEventListener('pointerdown',e=>{ if(e.target.closest('button')) e.preventDefault(); });
 }
 
+/* ───── الصوت ───── */
+let sndOn=true, actx=null;
+try{ sndOn=localStorage.getItem('pypath.snd')!=='0'; }catch(e){}
+function tone(f,t0,d,v,type){ const o=actx.createOscillator(), g=actx.createGain(); o.type=type||'sine'; o.frequency.value=f; const t=actx.currentTime+t0; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(v,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+d); o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+d+0.02); }
+function snd(k){
+  if(!sndOn) return;
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    if(!actx) actx=new AC(); if(actx.state==='suspended') actx.resume();
+    if(k==='tap') tone(520,0,0.05,0.07,'triangle');
+    else if(k==='ok'){ tone(660,0,0.12,0.12); tone(990,0.09,0.2,0.12); }
+    else if(k==='bad'){ tone(220,0,0.16,0.1,'triangle'); tone(165,0.12,0.24,0.1,'triangle'); }
+    else if(k==='win'){ [523,659,784,1047].forEach((f,i)=>tone(f,i*0.11,0.26,0.11)); }
+  }catch(e){}
+}
+
 /* ───── الأحداث ───── */
 app.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]'); if(!b||b.disabled) return;
+  if(b.dataset.act!=='check') snd('tap');
   const act=b.dataset.act, i=+b.dataset.i, st=session&&cur()?cur().st:null;
   switch(act){
     case 'lesson': startLesson(b.dataset.id); break;
@@ -584,6 +602,7 @@ app.addEventListener('click',e=>{
     case 'jump': startJump(b.dataset.id); break;
     case 'home': case 'quit': home(); break;
     case 'jumpfail': jumpFail(); break;
+    case 'snd': sndOn=!sndOn; try{localStorage.setItem('pypath.snd',sndOn?'1':'0');}catch(e){} snd('tap'); home(); break;
     case 'next': if(st.t==='info') session.cleared++; next(); break;
     case 'sel': ui.sel=i; body(); foot(); break;
     case 'fillt': { const k=ui.fill.indexOf(null); if(k>=0){ui.fill[k]=i; body(); foot();} break; }
