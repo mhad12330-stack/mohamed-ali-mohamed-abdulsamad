@@ -470,7 +470,7 @@ function body(){
     }
   }
   el.innerHTML=h;
-  if(st.t==='type'){ const a=$('#ans'); a.addEventListener('input',foot); a.addEventListener('keydown',e=>{ if(e.key==='Enter'&&a.value.trim()&&!ui.checked) check(); }); if(L){a.value=ui.typed;a.disabled=true;} }
+  if(st.t==='type'){ const a=$('#ans'); a.addEventListener('input',()=>{ if(ui.note){ui.note='';} foot(); }); a.addEventListener('keydown',e=>{ if(e.key==='Enter'&&a.value.trim()&&!ui.checked) check(); }); if(L){a.value=ui.typed;a.disabled=true;} }
   if(st.t==='code'){ bindEditor(); tools(); }
 }
 function tools(){
@@ -497,6 +497,7 @@ function foot(){
       `<div class="acts"><button class="btn ghost" data-act="run" ${ui.busy?'disabled':''}>${I.play} شغّل</button><button class="btn" data-act="check" ${ui.busy?'disabled':''}>${ui.busy?'جارٍ الفحص…':'تحقق'}</button></div>`;
   } else {
     const ready=st.t==='mc'||st.t==='bug'?ui.sel!=null:st.t==='type'?!!($('#ans')&&$('#ans').value.trim()):st.t==='fill'?ui.fill.every(x=>x!=null):ui.ord.length===st.lines.length;
+    if(ui.note) h+=`<div class="hint" role="status">${ui.note}</div>`;
     h+=`<div class="acts"><button class="btn wide" data-act="check" ${ready?'':'disabled'}>تحقق</button></div>`;
   }
   el.innerHTML=h;
@@ -506,7 +507,8 @@ function check(){
   const {st}=cur(); let ok=false, fb='';
   if(st.t==='code') return checkCode();
   if(st.t==='mc'||st.t==='bug') ok=ui.sel===st.a;
-  else if(st.t==='type'){ ui.typed=$('#ans').value; ok=nt(ui.typed)===nt(st.a); if(!ok) fb=`الناتج الصحيح: <code>${esc(st.a)}</code>`; }
+  else if(st.t==='type'){ ui.typed=$('#ans').value; ok=nt(ui.typed)===nt(st.a);
+    if(!ok&&nt(ui.typed).toLowerCase()===nt(st.a).toLowerCase()){ ui.note='قريب جداً. الأحرف صحيحة لكن انتبه للحرف الكبير والصغير: بايثون يعرض النص كما كُتب تماماً. عدّل إجابتك.'; foot(); $('#ans').focus(); return; } if(!ok) fb=`الناتج الصحيح: <code>${esc(st.a)}</code>`; }
   else if(st.t==='fill'){ ok=st.a.every((a,i)=>st.bank[ui.fill[i]]===a); if(!ok) fb=`الصحيح: <code>${esc(st.a.join(' , '))}</code>`; }
   else if(st.t==='order'){ ok=ui.ord.map(i=>st.lines[i]).join('\n')===st.lines.join('\n'); if(!ok) fb=`<pre class="code" style="margin-top:6px">${hl(st.lines.join('\n'))}</pre>`; }
   done(ok,fb);
